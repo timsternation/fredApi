@@ -1,62 +1,84 @@
-/* This script is designed to pull data from the FRED API. To use it, you'll need four things:
-
-1. An Apps Script file in your Google Drive containing the code
-2. A Google Sheet in your drive, where the sheet labels are the codes for the series you want to pull
-3. An API key you can register here: https://research.stlouisfed.org/docs/api/api_key.html
-4. Once you run the script for the first time, you'll need to give the app permission to access your account
-BONUS: here are the docs for the API: https://research.stlouisfed.org/docs/api/fred/
+/* This script is designed to pull data from the FRED API. 
+   To use it, you'll need:
+ 
+ 
+1. An API key you can register here: 
+   https://r...content-available-to-author-only...d.org/docs/api/api_key.html
+2. A google sheet, where the sheet names are the data series you wish to
+   pull (e.g. "CIVPART" for the civilian labor force participation rate)
+3. When you sheets are labeled, click the "Tools" menu. Select "Script editor"
+4. Paste the code below into the script editor window, updating the API
+   key in line 43 with the key you registered in step 1
+5. From the drop down menu above the editor window, select "myFunction"
+6. Click the play button to run
+ 
+BONUS: here are the docs for the API: 
+       https://r...content-available-to-author-only...d.org/docs/api/fred/
 */
-
+ 
+// This function actually queries the API for a data series
 function fredQuery(series, api_key) {
-    
-    var url = 'https://api.stlouisfed.org/fred/series/observations?series_id='
-
+ 
+    var url = 'https://a...content-available-to-author-only...d.org/fred/series/observations?series_id='
+ 
           + series
           + '&api_key=' + api_key
           + '&file_type=json'
     ;
     var response = UrlFetchApp.fetch(url, {'muteHttpExceptions': true});
-    Logger.log(url);
-    //Logger.log(response);
+    // Logger.log(response);
     var json = response.getContentText();
     var data = JSON.parse(json);
-    return data;
-  
+  Logger.log(series+" fetched");  
+  return data;
+ 
 }
-
+ 
+//This function calls the fredquery function and writes the data
 function getnwrite(s, ser) { // s = sheet
     var cell = s.setActiveSelection("a1")
-    //var ser = cell.getValue() //reads user input as to the series
     var ser = s.getName()
-    var data = fredQuery(series = ser, api_key = 'YOUR_API_KEY_HERE');
-    // Plug API key in, in quotes, above as indicated
-    Logger.log(data.observations[0].date);
-  s.clear() //delete old data
-  
-  //write header rows
-  s.appendRow(["Observation Date","Observation Value","Date Collected","Series"]); 
-    
-  
-  //now a loop to write the data
-  for (var i = 0; i< data.observations.length; ++i) {
-    s.appendRow([data.observations[i]["date"],
+        // Plug API key in, in quotes, below as indicated
+    var data = fredQuery(series = ser, 
+                         api_key = 'YOURKEYHERE');
+  s.clear() //delete old data, because BLS sometimes revises old estimates.
+ 
+    var array = []
+    // write header rows
+  array[0] = (["Observation Date",
+               "Observation Value",
+               "Date Collected","Series"]); 
+ 
+ 
+  // this for loop creates an array of the data
+  for (var i = 1; i< data.observations.length; ++i) {
+    array[i] = ([data.observations[i]["date"],
     data.observations[i]["value"],
     data.observations[i]["realtime_end"],
-    ser])
-
+    series])
   }
+ 
+  //write array to sheet
+  var num = array.length.toString()
+  var r = s.getRange('a1:d'+num)
+  s.setActiveRange(r)
+  r.setValues(array)
+  Logger.log(ser+' written')
+ 
 }
-
+ 
+//This is the main function. It loops over the sheet names to call the getnwrite 
+//function for each sheet (i.e. series)
+ 
 function myFunction(){
-      var ss = SpreadsheetApp.openById('YOUR SHEET ID HERE') 
-      //To get your Google Sheet ID, open it up in your browser and pull it from the URL
-      // .../spreadsheets/d/THIS_IS_YOUR_SHEET_ID/edit#gid
-      //Once copied, insert it into the script in quotes
-      var sheetNames = ss.getSheets()
+ 
+      var ss = SpreadsheetApp.getActive()
+      var sheetNames = ss.getSheets()       
       for (var i = 0; i<sheetNames.length; ++i) {
            var name = sheetNames[i].getName()
            var sheet = ss.getSheetByName(name)
            getnwrite(s = sheet, ser = name)
-           
+ 
+ 
       }
 }
