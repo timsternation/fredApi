@@ -1,0 +1,122 @@
+/*
+This is an updated version of the script, which is developed for the specific purpose of providing 
+data for a dashboard I'm building in Excel.
+
+The output gets written to whatever Google sheet the script is associated with. I have also included 
+a sheet in my Google Sheets file with some metadata on the different series.
+
+Limitations of the below script are that it is not as customizable, so to add more series and 
+units will require edits to the script itself.
+
+Here is the FredAPI documentation: https://fred.stlouisfed.org/docs/api/fred/
+
+Here is a link to a template Google Sheet: https://docs.google.com/spreadsheets/d/1AASRX4rTAaOTWJMBe7HOhU2qgTICq8OFSx7prnip3lQ/edit?usp=sharing
+
+To access the script within the dummy Google sheet, click 'tools' and then 'script editor'
+
+Don't forget to plug your own API key in at line 88
+*/
+
+function myFunction() { //this is the main function. Run this to get your data
+  
+    var wb = SpreadsheetApp.getActiveSpreadsheet(); //sets your Google Sheets file to active
+    var s = SpreadsheetApp.setActiveSheet(wb.getSheets()[0]); //Sets the first sheet in the workbook to active
+    var series_list = [  "AHETPI"
+                       , "AWHI"
+                       , "CIVPART"
+                       , "EMRATIO"
+                       , "ICSA"
+                       , "JTS1000HIR"
+                       , "JTSQUL"
+                       , "LNS12032194"
+                       , "LNS13023654"
+                       , "LNS13023706"
+                       , "LNS13025703"
+                       , "LNS17100000"
+                       , "PAYEMS"
+                       , "TEMPHELPS"
+                       , "U6RATE"
+                       , "UNRATE"]; //edit this list as you see fit using series labels found on FRED
+    var unit_list = [  "lin"
+                     , "chg"
+                     , "ch1"
+                     , "pch"
+                     , "pc1"]; //list of units to be pulled
+    write_data(get_array(series_list,unit_list),s); //calls to function to pull in data to the active sheet
+  }
+  
+  // This function actually queries the API for a data series
+  function fredQuery(series, api_key) { //necessary parameters are a FRED series label and your API key
+      
+      var url = 'https://api.stlouisfed.org/fred/series/observations?series_id=' //base URL for API call
+  
+            + series 
+            + '&api_key=' + api_key
+            + '&file_type=json' //we're getting our results in JSON format
+            + '&units=' + u;
+
+    Logger.log(url) //writes to the log for troubleshooting
+    var response = UrlFetchApp.fetch(url, {'muteHttpExceptions': true}); //makes the API call
+      // Logger.log(response);
+      var json = response.getContentText(); //grabs your JSON output
+      var data = JSON.parse(json); //parses the output
+    Logger.log(series+" fetched");  //log for troubleshooting
+    return data; //the function returns the data for a single series  
+  }
+  
+  //This function calls the fredquery function and writes the data
+  function get_array(series_list,unit_list) { // takes a worksheet as a parameter
+  
+    var array = [] //an empty array to hold the data prior to writing to the sheet. Ultimately it will hold the data for each series
+    // write header rows in the array
+    array.push(["Observation Date", //date the value is for
+                 "Date Collected", //date the data are pulled from the API
+                 "Series",
+                 "obs_id", //unique ID I created in the event I put the data into a SQL server, probably unecessary
+                 "Observation Value", //unit type "lin"
+                 "Change", //unit type "chg", raw sequential change
+                 "YoY_change", //unit type "ch1", raw year-over-year change
+                 "Percent_change", //sequential % change
+                 "YoY_percent_change" //YoY % change
+                 ]); 
+        
+    for (ser of series_list) { //iterates over series list above
+      //the "data" variable houses the output of the fredQuery function defined above  
+      var raw_array = []; //we need multiple queries per series due to different unit types, so we can house them here
+      for (unit of unit_list){
+        var data = fredQuery(series = ser, 
+                             api_key = YOUR-API-KEY-HERE-IN-QUOTES, // Plug API key in, in quotes, as indicated
+                             u = unit); 
+        raw_array.push(data)    
+      }
+      // this for loop iterates over the data variable for each series, writing the data into the same array
+        for (var i = 0; i< data.observations.length; ++i) { //the loop needs to run over each observation, hence the counter
+                array.push([raw_array[0].observations[i]["date"], //each time this loop runs, it writes the next row of data to the array.
+                raw_array[0].observations[i]["realtime_end"],
+                series,
+                raw_array[0].observations[i]["date"]+"_"+series,
+                raw_array[0].observations[i]["value"], //pulling from each query to capture the various unit types
+                raw_array[1].observations[i]["value"],
+                raw_array[2].observations[i]["value"],
+                raw_array[3].observations[i]["value"],
+                raw_array[4].observations[i]["value"]
+            ]);
+            }
+     
+    
+      Logger.log(series+"in array"); //just for troubleshooting  
+    }
+    //Logger.log(array); //just for troubleshooting
+    return array  
+  }
+  
+  function write_data(array,s) { //takes an array and a spreadsheet as parameters
+    var cell = s.setActiveSelection("a1"); //this is the first cell where data will be written to the sheet
+    s.clear() //delete old data, because BLS sometimes revises old estimates.
+    //finally, write array to sheet
+    var num = array.length.toString() //getting the number of rows we'll be writing to
+    var r = s.getRange('a1:i'+num) //defining the range we'll be writing to using the numb found on the previous line
+    s.setActiveRange(r) 
+    r.setValues(array)
+    Logger.log(ser+' written') //one last line of troubleshooting for old times' sake
+  }
