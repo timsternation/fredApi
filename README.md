@@ -13,7 +13,7 @@ To use:
 
 4. In the Apps Script editor, run "My Function" up at the top.
 
-5. Sit back and relax as that sweet, sweet data comes pouring in./*
+5. Sit back and relax as that sweet, sweet data comes pouring in.
 
 ## Second version - FredQuery_v2:
 
